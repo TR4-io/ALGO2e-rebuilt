@@ -12,6 +12,10 @@ from signals import Market
 from policy import phase, quote, take, sweep, inventory_limit
 
 
+class MissingOrder(ApiError):
+    """Order absent from detail and status snapshots."""
+
+
 class Recorder:
     def __init__(self, stream=None):
         self.stream = stream
@@ -121,7 +125,7 @@ class Bot:
             for horizon in (.5, 1., 3.):
                 self.pending.append((now, horizon, o.ticker, o.action, delta, snapshot[0].mid, fill_price, intent))
 
-    def lookup(self, oid):
+    def lookup_once(self, oid):
         try:
             return self.api('GET', f'orders/{oid}')
         except HttpError as exc:
@@ -132,7 +136,17 @@ class Bot:
                             if integer(r['order_id']) == oid), None)
                 if row is not None:
                     return row
-            raise ApiError(f'Order {oid} missing; refusing to guess its fills')
+            raise MissingOrder(f'Order {oid} missing; refusing to guess its fills')
+
+    def lookup(self, oid):
+        # Detail and status lists can briefly disagree during a transition.
+        for attempt in range(11):
+            try:
+                return self.lookup_once(oid)
+            except MissingOrder:
+                if attempt == 10:
+                    raise
+                time.sleep(0.1)
 
     def reconcile(self):
         rows = {integer(r['order_id']): r for r in self.api('GET', 'orders', status='OPEN')}
@@ -147,10 +161,21 @@ class Bot:
         except HttpError as exc:
             if exc.status != 404:
                 raise
-        self.update(self.lookup(o.id))
-        self.record.emit('cancel', tick=self.tick, order_id=o.id, reason=reason)
-        if o.remaining:
-            raise ApiError('Cancellation not yet confirmed; no replacement submitted')
+        # DELETE acknowledgement is not a final fill report. Poll reads only;
+        # retain the remaining reservation and never submit while unresolved.
+        for attempt in range(11):
+            try:
+                self.update(self.lookup_once(o.id))
+            except MissingOrder:
+                pass
+            else:
+                if o.status != 'OPEN' or o.filled == o.quantity:
+                    self.record.emit('cancel', tick=self.tick, order_id=o.id, reason=reason)
+                    return
+            if attempt < 10:
+                time.sleep(0.1)
+        raise ApiError(f'Cancellation of order {o.id} not confirmed after 11 checks; '
+                       'no replacement submitted')
 
     def cancel_all(self):
         for o in list(self.ledger.active()):
