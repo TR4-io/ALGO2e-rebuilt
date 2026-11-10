@@ -1,0 +1,17 @@
+{
+  "minimum_volume": 100000,
+  "volume_buffer": 0.1,
+  "qualify_by": 240,
+  "reduce_at": 260,
+  "last_entry": 275,
+  "flatten_at": 280,
+  "gross_budget": 18000,
+  "net_budget": 18000,
+  "stock_budget": 6000,
+  "base_clip": 1000,
+  "max_clip": 2000,
+  "taker_clip": 500,
+  "taker_enabled": true,
+  "soft_loss": 500,
+  "hard_loss": 1500
+}
