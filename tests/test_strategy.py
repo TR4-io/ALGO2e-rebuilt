@@ -251,7 +251,7 @@ class ExecutionTests(unittest.TestCase):
         b.book = Mock(return_value=({'bids': [(10, 3000)], 'asks': [(10.02, 3000)]}, 1))
         b.submit = Mock(return_value=None)
         b.manage('CNR')
-        b.submit.assert_called_once_with('CNR', 'SELL', 1000, 10, 'RISK_REDUCE', 1)
+        b.submit.assert_called_once_with('CNR', 'SELL', 1500, 10, 'RISK_REDUCE', 1)
 
     def test_hard_stop_precedes_qualification(self):
         b = self.bot()

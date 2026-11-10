@@ -16,8 +16,8 @@ class Config:
     gross_budget: int = 18000
     net_budget: int = 18000
     stock_budget: int = 6000
-    base_clip: int = 1000
-    max_clip: int = 2000
+    base_clip: int = 1500
+    max_clip: int = 2500
     taker_clip: int = 500
     poll_seconds: float = 0.10
     max_book_age: float = 0.60

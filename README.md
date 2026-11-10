@@ -34,6 +34,8 @@ Default minimum is therefore **100,000 per run**, with a 110,000 target by tick 
 
 The final grade depends on per-run P&L ranks and can be reduced by a downside-deviation grade. Lower-risk participation matters, but a no-loss record does not automatically produce a high P&L rank. The bot cannot observe everyone else's final scores or directly optimize the unknown live rank.
 
+Default maker sizing is 1,500 shares at the base, capped at 2,500 shares before inventory and risk constraints. Speculative taker clips remain 500 shares. The shared base clip also sizes inventory-reduction orders; inventory, gross/net and loss limits are unchanged. These larger clips have not been validated in live competitive runs.
+
 ## Strategy decisions
 
 1. **Signals from multiple book levels.** Remove all known own order IDs, aggregate remaining quantities, and use the first five price levels within five cents. Combine weighted depth imbalance, top-level microprice, snapshot order-flow imbalance, short momentum and volatility. Smooth rapidly changing quantities and discount unstable depth. A data gap resets the signal warmup.
