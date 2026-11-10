@@ -125,9 +125,47 @@ class ExecutionTests(unittest.TestCase):
         b = self.bot()
         o = Order(1, 'CNR', 'BUY', 1000, 10, 0)
         b.ledger.orders[1] = o
-        b.api = Mock(side_effect=[{}, row()])
-        with self.assertRaises(ApiError):
+        b.api = Mock(return_value=row())
+        with patch('engine.time.sleep'), self.assertRaises(ApiError):
             b.cancel(o)
+        self.assertEqual(o.remaining, 1000)
+        self.assertEqual(b.api.call_count, 12)
+
+    def test_cancel_waits_through_open_and_missing_snapshots(self):
+        b = self.bot()
+        o = Order(1, 'CNR', 'BUY', 1000, 10, 0)
+        b.ledger.orders[1] = o
+        b.api = Mock(side_effect=[{'success': True}, row(filled=200),
+                                 HttpError(404, 'orders/1'), [], [], [],
+                                 row(filled=700, status='CANCELLED')])
+        with patch('engine.time.sleep'):
+            b.cancel(o)
+        self.assertEqual(b.ledger.volume, 700)
+        self.assertEqual(b.ledger.positions['CNR'], 700)
+        self.assertFalse(b.ledger.active())
+        self.assertEqual(sum(c.args[0] == 'DELETE' for c in b.api.call_args_list), 1)
+        self.assertFalse(any(c.args[0] == 'POST' for c in b.api.call_args_list))
+
+    def test_cancel_can_race_with_complete_fill(self):
+        b = self.bot()
+        o = Order(1, 'CNR', 'BUY', 1000, 10, 0)
+        b.ledger.orders[1] = o
+        b.api = Mock(side_effect=[HttpError(404, 'orders/1'),
+                                 row(filled=1000, status='TRANSACTED')])
+        b.cancel(o)
+        self.assertEqual(b.ledger.volume, 1000)
+        self.assertFalse(b.ledger.active())
+
+    def test_missing_order_lookup_recovers_and_is_bounded(self):
+        from engine import MissingOrder
+        b = self.bot()
+        b.lookup_once = Mock(side_effect=[MissingOrder('missing'), row(status='CANCELLED')])
+        with patch('engine.time.sleep'):
+            self.assertEqual(b.lookup(1)['status'], 'CANCELLED')
+        b.lookup_once = Mock(side_effect=MissingOrder('missing'))
+        with patch('engine.time.sleep'), self.assertRaises(MissingOrder):
+            b.lookup(1)
+        self.assertEqual(b.lookup_once.call_count, 11)
 
     def test_404_terminal_recovery(self):
         b = self.bot()

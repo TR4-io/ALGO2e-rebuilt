@@ -84,3 +84,7 @@ Before grading:
 `strategy.py`: CLI and shutdown; `engine.py`: lifecycle and reconciliation; `execution.py`: REST, ledger and risk; `signals.py`: book estimates; `policy.py`: quote/taker/phase decisions; `config.py`: validated settings; `analyze_run.py`: offline logs; `stress_check.py`: synthetic checks.
 
 Course PDFs are referenced above and are not redistributed. This rebuild retains the original draft's fee convention, REST transport and independent-fill risk approach while replacing its strategy and lifecycle logic.
+
+## Cancellation confirmation
+
+Cancellation now polls up to 11 times, with 0.1 seconds between reads, to tolerate delayed OPEN and temporarily missing order snapshots. Missing-order reconciliation uses the same bounded retry policy. Network request time is additional. Remaining shares stay reserved until a final status or complete fill is observed; acknowledgements and disappearance alone never establish fills. If confirmation still fails, the bot stops rather than replacing an unresolved order. This handles transient visibility delays, not permanently unavailable order history.
